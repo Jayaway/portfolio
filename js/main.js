@@ -1,216 +1,289 @@
-/* ============================================================
-   个人站 — 交互逻辑
-   1. 移动端汉堡菜单
-   2. 导航栏滚动效果
-   3. 当前可视区块高亮导航
-   4. 滚动渐入动画
-   ============================================================ */
-
-(function () {
-  'use strict';
-
-  /* ---- DOM 引用 ---- */
-  const nav = document.getElementById('nav');
-  const navToggle = document.getElementById('navToggle');
-  const navLinks = document.getElementById('navLinks');
-  const allNavLinks = navLinks.querySelectorAll('a');
-  const fadeElements = document.querySelectorAll('.fade-up');
-
-
-  /* ============================================================
-     1. 移动端汉堡菜单
-     ============================================================ */
-
-  function closeMenu() {
-    navToggle.classList.remove('open');
-    navLinks.classList.remove('open');
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)");
+  const small = matchMedia("(max-width: 600px)");
+  const nav = $("nav");
+  const links = $("navLinks");
+  const toggle = $("menuToggle");
+  const dialog = $("filmDialog");
+  const player = $("filmPlayer");
+  let menuOpen = false;
+  const lockScroll = () => {
+    document.body.style.overflow = menuOpen || dialog.open ? "hidden" : "";
+  };
+  function setMenu(open, restoreFocus = false) {
+    menuOpen = open;
+    links.classList.toggle("open", open);
+    toggle.setAttribute("aria-expanded", String(open));
+    toggle.setAttribute("aria-label", open ? "关闭菜单" : "打开菜单");
+    lockScroll();
+    if (open) links.querySelector("a").focus();
+    else if (restoreFocus) toggle.focus();
   }
-
-  function openMenu() {
-    navToggle.classList.add('open');
-    navLinks.classList.add('open');
-  }
-
-  navToggle.addEventListener('click', function () {
-    const isOpen = navLinks.classList.contains('open');
-    isOpen ? closeMenu() : openMenu();
-  });
-
-  // 点击导航链接后关闭菜单
-  allNavLinks.forEach(function (link) {
-    link.addEventListener('click', closeMenu);
-  });
-
-  // 点击页面其他区域关闭菜单
-  document.addEventListener('click', function (e) {
-    if (!nav.contains(e.target)) {
-      closeMenu();
+  toggle.addEventListener("click", () => setMenu(!menuOpen));
+  links
+    .querySelectorAll("a")
+    .forEach((link) => link.addEventListener("click", () => setMenu(false)));
+  small.addEventListener("change", () => setMenu(false));
+  document.addEventListener("keydown", (event) => {
+    if (!menuOpen) return;
+    if (event.key === "Escape") setMenu(false, true);
+    if (event.key !== "Tab") return;
+    const first = links.querySelector("a");
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      toggle.focus();
+    } else if (!event.shiftKey && document.activeElement === toggle) {
+      event.preventDefault();
+      first.focus();
     }
   });
-
-
-  /* ============================================================
-     2. 导航栏滚动效果
-     ============================================================ */
-
-  function updateNavStyle() {
-    if (window.scrollY > 20) {
-      nav.classList.add('nav--scrolled');
-    } else {
-      nav.classList.remove('nav--scrolled');
-    }
-  }
-
-  window.addEventListener('scroll', updateNavStyle, { passive: true });
-  updateNavStyle(); // 初始检测（防止刷新时已在页面中部）
-
-
-  /* ============================================================
-     3. 可视区块检测 → 导航高亮
-     ============================================================ */
-
-  // 收集所有带 id 的 section
-  var sectionIds = [];
-  allNavLinks.forEach(function (link) {
-    var href = link.getAttribute('href');
-    if (href && href.startsWith('#')) {
-      sectionIds.push(href.slice(1));
-    }
-  });
-
-  // IntersectionObserver — 现代浏览器都支持
-  if ('IntersectionObserver' in window) {
-    var observerOptions = {
-      root: null,
-      rootMargin: '-20% 0px -70% 0px', // 区块接近顶部时触发
-      threshold: 0,
-    };
-
-    var observer = new IntersectionObserver(function (entries) {
-      entries.forEach(function (entry) {
-        if (entry.isIntersecting) {
-          // 移除所有 active
-          allNavLinks.forEach(function (a) { a.classList.remove('active'); });
-          // 高亮对应链接
-          var activeLink = navLinks.querySelector('[href="#' + entry.target.id + '"]');
-          if (activeLink) {
-            activeLink.classList.add('active');
+  const updateNav = () => nav.classList.toggle("scrolled", scrollY > 40);
+  addEventListener("scroll", updateNav, { passive: true });
+  updateNav();
+  if ("IntersectionObserver" in window) {
+    const reveal = new IntersectionObserver(
+      (entries) =>
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("visible");
+            reveal.unobserve(entry.target);
           }
-        }
-      });
-    }, observerOptions);
-
-    // 观察所有区块
-    sectionIds.forEach(function (id) {
-      var el = document.getElementById(id);
-      if (el) observer.observe(el);
-    });
-  }
-
-
-  /* ============================================================
-     4. 滚动渐入动画（fade-up）
-     ============================================================ */
-
-  if ('IntersectionObserver' in window && fadeElements.length > 0) {
-    var fadeObserver = new IntersectionObserver(function (entries) {
-      entries.forEach(function (entry) {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('visible');
-          fadeObserver.unobserve(entry.target); // 只触发一次
-        }
-      });
-    }, {
-      root: null,
-      rootMargin: '0px 0px -40px 0px', // 元素底部进入视口前 40px 触发
-      threshold: 0,
-    });
-
-    fadeElements.forEach(function (el) {
-      fadeObserver.observe(el);
-    });
-  } else {
-    // 兜底：不支持 IntersectionObserver 就直接显示
-    fadeElements.forEach(function (el) {
-      el.classList.add('visible');
-    });
-  }
-
-  /* ============================================================
-     5. Email 弹窗 & 复制
-     ============================================================ */
-
-  var btnEmail = document.getElementById('btnEmail');
-  var emailModal = document.getElementById('emailModal');
-  var btnModalClose = document.getElementById('btnModalClose');
-  var btnCopyEmail = document.getElementById('btnCopyEmail');
-  var copyToast = document.getElementById('copyToast');
-
-  if (btnEmail && emailModal) {
-
-    // 打开弹窗
-    btnEmail.addEventListener('click', function () {
-      emailModal.classList.add('open');
-      // 重置 toast
-      copyToast.classList.remove('show');
-      copyToast.textContent = '✓ 已复制';
-    });
-
-    // 关闭弹窗
-    function closeModal() {
-      emailModal.classList.remove('open');
-    }
-
-    btnModalClose.addEventListener('click', closeModal);
-
-    // 点击遮罩关闭
-    emailModal.addEventListener('click', function (e) {
-      if (e.target === emailModal) closeModal();
-    });
-
-    // ESC 关闭
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && emailModal.classList.contains('open')) {
-        closeModal();
-      }
-    });
-
-    // 复制到剪贴板
-    if (btnCopyEmail) {
-      btnCopyEmail.addEventListener('click', function () {
-        var email = 'songsoc@126.com';
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(email).then(function () {
-            copyToast.classList.add('show');
-          }).catch(function () {
-            // 降级方案
-            fallbackCopy(email);
+        }),
+      { threshold: 0, rootMargin: "0px 0px -20px 0px" },
+    );
+    document.querySelectorAll(".reveal").forEach((el) => reveal.observe(el));
+    document.documentElement.classList.add("js");
+    const sectionObserver = new IntersectionObserver(
+      (entries) =>
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          links.querySelectorAll("a").forEach((link) => {
+            if (link.hash === "#" + entry.target.id)
+              link.setAttribute("aria-current", "location");
+            else link.removeAttribute("aria-current");
           });
-        } else {
-          fallbackCopy(email);
-        }
-      });
+        }),
+      { rootMargin: "-15% 0px -60% 0px" },
+    );
+    document
+      .querySelectorAll("main section[id]")
+      .forEach((el) => sectionObserver.observe(el));
+  }
+  $("copyEmail").addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText("songsoc@126.com");
+      $("copyStatus").textContent = "邮箱已复制";
+    } catch {
+      $("copyStatus").textContent = "请手动复制：songsoc@126.com";
     }
-
-    function fallbackCopy(text) {
-      var ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.position = 'fixed';
-      ta.style.left = '-9999px';
-      ta.style.top = '-9999px';
-      document.body.appendChild(ta);
-      ta.focus();
-      ta.select();
-      try {
-        var ok = document.execCommand('copy');
-        copyToast.textContent = ok ? '✓ 已复制' : '✗ 复制失败，请手动复制';
-        copyToast.classList.add('show');
-      } catch (e) {
-        copyToast.textContent = '✗ 复制失败，请手动复制';
-        copyToast.classList.add('show');
-      }
-      document.body.removeChild(ta);
+  });
+  function mediaURL(value) {
+    if (!value || typeof value !== "string") return "";
+    try {
+      const url = new URL(value, location.href);
+      return ["https:", "http:"].includes(url.protocol) ? url.href : "";
+    } catch {
+      return "";
     }
   }
-
+  let lastFilmButton;
+  function openFilm(film, button) {
+    lastFilmButton = button;
+    $("filmTitle").textContent = film.title;
+    $("filmDescription").textContent = [film.role, film.description]
+      .filter(Boolean)
+      .join(" · ");
+    $("filmError").textContent = "";
+    player.src = mediaURL(film.src);
+    player.poster = mediaURL(film.poster);
+    dialog.showModal();
+    lockScroll();
+    player.play().catch(() => {
+      $("filmError").textContent = "点击播放器的播放按钮开始观看。";
+    });
+  }
+  $("closeFilm").addEventListener("click", () => dialog.close());
+  dialog.addEventListener("click", (event) => {
+    if (event.target === dialog) {
+      const rect = dialog.getBoundingClientRect();
+      if (
+        event.clientX < rect.left ||
+        event.clientX > rect.right ||
+        event.clientY < rect.top ||
+        event.clientY > rect.bottom
+      )
+        dialog.close();
+    }
+  });
+  dialog.addEventListener("close", () => {
+    player.pause();
+    player.removeAttribute("src");
+    player.load();
+    lockScroll();
+    lastFilmButton?.focus();
+  });
+  player.addEventListener("error", () => {
+    if (player.hasAttribute("src"))
+      $("filmError").textContent =
+        "视频暂时无法加载，请稍后重试，或邮件联系获取作品。";
+  });
+  function renderFilms(films) {
+    const entries = films.filter((film) => film.title && mediaURL(film.src));
+    $("filmEmpty").hidden = entries.length > 0;
+    for (const film of entries) {
+      const card = document.createElement("article");
+      card.className = "film-card";
+      const button = document.createElement("button");
+      button.className = "film-cover";
+      button.setAttribute("aria-label", "播放：" + film.title);
+      if (mediaURL(film.poster)) {
+        const img = document.createElement("img");
+        img.src = mediaURL(film.poster);
+        img.alt = "";
+        img.loading = "lazy";
+        img.decoding = "async";
+        button.append(img);
+      }
+      const play = document.createElement("span");
+      play.className = "film-play";
+      play.textContent = "▷";
+      play.setAttribute("aria-hidden", "true");
+      button.append(play);
+      button.addEventListener("click", () => openFilm(film, button));
+      const caption = document.createElement("div");
+      caption.className = "film-caption";
+      const title = document.createElement("h3");
+      title.textContent = film.title;
+      const meta = document.createElement("p");
+      meta.textContent = [film.category, film.role, film.year]
+        .filter(Boolean)
+        .join(" / ");
+      caption.append(title, meta);
+      card.append(button, caption);
+      $("filmGrid").append(card);
+    }
+  }
+  function initBackground(config) {
+    const video = $("backgroundVideo");
+    const control = $("motionToggle");
+    let manualPause = false;
+    let failed = false;
+    let target = 0;
+    let previousX = null;
+    const enabled = () => !manualPause && !reduced.matches && !failed;
+    const seek = () => {
+      if (
+        !enabled() ||
+        document.hidden ||
+        video.seeking ||
+        video.readyState < 1 ||
+        !Number.isFinite(video.duration)
+      )
+        return;
+      if (Math.abs(video.currentTime - target) > 0.035)
+        video.currentTime = target;
+    };
+    const update = () => {
+      previousX = null;
+      control.textContent = failed
+        ? "背景暂不可用"
+        : reduced.matches
+          ? "背景动效：已减少"
+          : enabled()
+            ? "背景动效：开启"
+            : "背景动效：暂停";
+      control.setAttribute("aria-pressed", String(!enabled()));
+      control.disabled = reduced.matches || failed;
+      if (enabled() && !video.getAttribute("src") && mediaURL(config.src))
+        video.src = mediaURL(config.src);
+    };
+    video.poster = mediaURL(config.poster);
+    video.muted = true;
+    control.addEventListener("click", () => {
+      manualPause = !manualPause;
+      update();
+    });
+    reduced.addEventListener("change", update);
+    video.addEventListener("seeked", seek);
+    video.addEventListener("error", () => {
+      failed = true;
+      video.hidden = true;
+      update();
+    });
+    addEventListener(
+      "pointermove",
+      (event) => {
+        if (
+          !enabled() ||
+          dialog.open ||
+          menuOpen ||
+          document.hidden ||
+          event.pointerType !== "mouse"
+        ) {
+          previousX = null;
+          return;
+        }
+        if (previousX !== null && Number.isFinite(video.duration)) {
+          const sensitivity = Number.isFinite(config.sensitivity)
+            ? config.sensitivity
+            : 0.8;
+          target = Math.max(
+            0,
+            Math.min(
+              Math.max(0, video.duration - 0.05),
+              target +
+                ((event.clientX - previousX) / innerWidth) *
+                  sensitivity *
+                  video.duration,
+            ),
+          );
+          seek();
+        }
+        previousX = event.clientX;
+      },
+      { passive: true },
+    );
+    document.documentElement.addEventListener("pointerleave", () => {
+      previousX = null;
+    });
+    document.addEventListener("visibilitychange", () => {
+      previousX = null;
+    });
+    // Touch devices scrub with page progress without blocking vertical scrolling.
+    addEventListener(
+      "scroll",
+      () => {
+        if (
+          !matchMedia("(pointer: coarse)").matches ||
+          !enabled() ||
+          !Number.isFinite(video.duration)
+        )
+          return;
+        const distance = document.documentElement.scrollHeight - innerHeight;
+        target =
+          distance > 0
+            ? Math.max(0, Math.min(1, scrollY / distance)) *
+              Math.max(0, video.duration - 0.05)
+            : 0;
+        seek();
+      },
+      { passive: true },
+    );
+    update();
+  }
+  fetch("data/site.json")
+    .then((response) => {
+      if (!response.ok) throw new Error("Config unavailable");
+      return response.json();
+    })
+    .then((config) => {
+      renderFilms(Array.isArray(config.films) ? config.films : []);
+      initBackground(config.background || {});
+    })
+    .catch(() => {
+      $("motionToggle").textContent = "背景暂不可用";
+      $("motionToggle").disabled = true;
+    });
 })();
