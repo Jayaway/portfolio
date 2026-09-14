@@ -85,12 +85,7 @@ video:focus-visible {
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background: radial-gradient(
-    ellipse at 80% 15%,
-    #51594b,
-    #171d1a 60%,
-    #111311
-  );
+  background: #861c2f url("../media/character-poster.jpg") 70% center / cover no-repeat;
   overflow: hidden;
 }
 .site-background video {
@@ -98,15 +93,15 @@ video:focus-visible {
   height: 100%;
   object-fit: cover;
   object-position: 70% center;
-  opacity: 0.65;
+  opacity: 1;
 }
 .site-background:after {
   content: "";
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(90deg, rgba(9, 14, 11, 0.76), rgba(9, 14, 11, 0.36)),
-    linear-gradient(0deg, rgba(9, 14, 11, 0.38), transparent);
+    linear-gradient(90deg, rgba(24, 5, 10, 0.58), rgba(24, 5, 10, 0.12)),
+    linear-gradient(0deg, rgba(24, 5, 10, 0.2), transparent);
   pointer-events: none;
 }
 .skip-link {
